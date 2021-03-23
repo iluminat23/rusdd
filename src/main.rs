@@ -1,9 +1,14 @@
+extern crate byte_unit;
+use byte_unit::Byte;
 extern crate clap;
-use clap::{Arg, ArgGroup, App};
+use clap::{Arg, App};
 use std::fs::OpenOptions;
 use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::convert::{From, TryFrom};
+
+const BLOCKSIZE:usize = 4096;
 
 fn main() -> io::Result<()> {
     let matches = App::new("rusdd: dd in Rust")
@@ -19,19 +24,44 @@ fn main() -> io::Result<()> {
             .required(true)
             .index(2)
         )
-        .args_from_usage(
-            "--bs [blocksize] 'set the input and output blocksize'
-                                        --ibs [blocksize]   'set the input blocksize'
-                                        --obs [blocksize]   'set the output blocksize",
+        .arg(Arg::with_name("bs")
+            .help("set the blocksize for input and output")
+            .short("B")
+            .long("bs")
+            .alias("blocksize")
+            .takes_value(true)
+            .value_name("BLOCKSIZE")
         )
-        .group(
-            ArgGroup::with_name("blocksize")
-            .args(&["bs", "ibs", "obs"]),
+        .arg(Arg::with_name("ibs")
+            .help("set the input blocksize")
+            .short("I")
+            .long("ibs")
+            .alias("input-blocksize")
+            .takes_value(true)
+            .value_name("BLOCKSIZE")
+            .conflicts_with("blocksize")
+        )
+        .arg(Arg::with_name("obs")
+            .help("set the output blocksize")
+            .short("O")
+            .long("obs")
+            .alias("outout-blocksize")
+            .takes_value(true)
+            .value_name("BLOCKSIZE")
+            .conflicts_with("blocksize")
         )
         .get_matches();
 
     let infile_name = matches.value_of("INPUT").unwrap();
     let outfile_name = matches.value_of("OUTPUT").unwrap();
+
+    let ibs = matches.value_of("ibs").unwrap_or(BLOCKSIZE)
+
+    println!("ibs: {}", ibs);
+    let ibs = Byte::from_str(ibs).unwrap().get_bytes();
+    println!("ibs: {}", ibs);
+    let ibs:usize = usize::try_from(ibs).unwrap();
+    println!("ibs: {}", ibs);
 
     let infile = OpenOptions::new()
         .read(true)
@@ -42,7 +72,7 @@ fn main() -> io::Result<()> {
         .open(outfile_name)?;
 
     let buf_size = 1 * 1024 * 1024;
-    let mut reader = BufReader::with_capacity(buf_size, infile);
+    let mut reader = BufReader::with_capacity(ibs, infile);
     let mut writer = BufWriter::with_capacity(buf_size, outfile);
 
     io::copy(&mut reader, &mut writer)?;
