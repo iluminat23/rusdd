@@ -55,12 +55,25 @@ fn main() -> io::Result<()> {
     let infile_name = matches.value_of("INPUT").unwrap();
     let outfile_name = matches.value_of("OUTPUT").unwrap();
 
-    let ibs = matches.value_of("ibs").unwrap_or(BLOCKSIZE)
+    let ibs = match matches.value_of("ibs") {
+        None => Ok(BLOCKSIZE),
+        Some(ibs) => {
+            match Byte::from_str(ibs) {
+                Err(e) => e,
+                Ok(ibs) => {
+                    match usize::try_from(ibs.get_bytes()) {
+                        Err(e) => e,
+                        Ok(ibs) => ibs,
+                    }
+                }
+            }
+        }
+    };
+    let ibs = match ibs {
+        Err(e) => panic!("Can't invalid ibs argument: {}", e),
+        Ok(ibs) => ibs,
+    };
 
-    println!("ibs: {}", ibs);
-    let ibs = Byte::from_str(ibs).unwrap().get_bytes();
-    println!("ibs: {}", ibs);
-    let ibs:usize = usize::try_from(ibs).unwrap();
     println!("ibs: {}", ibs);
 
     let infile = OpenOptions::new()
