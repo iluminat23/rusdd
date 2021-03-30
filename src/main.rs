@@ -1,12 +1,12 @@
 extern crate byte_unit;
-use byte_unit::Byte;
+//use byte_unit::Byte;
 extern crate clap;
 use clap::{Arg, App};
 use std::fs::OpenOptions;
 use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
-use std::convert::{From, TryFrom};
+//use std::convert::{From, TryFrom};
 
 const BLOCKSIZE:usize = 4096;
 
@@ -56,22 +56,11 @@ fn main() -> io::Result<()> {
     let outfile_name = matches.value_of("OUTPUT").unwrap();
 
     let ibs = match matches.value_of("ibs") {
-        None => Ok(BLOCKSIZE),
-        Some(ibs) => {
-            match Byte::from_str(ibs) {
-                Err(e) => e,
-                Ok(ibs) => {
-                    match usize::try_from(ibs.get_bytes()) {
-                        Err(e) => e,
-                        Ok(ibs) => ibs,
-                    }
-                }
-            }
-        }
-    };
-    let ibs = match ibs {
-        Err(e) => panic!("Can't invalid ibs argument: {}", e),
-        Ok(ibs) => ibs,
+        None => BLOCKSIZE,
+        Some(ibs) => match ibs.parse::<usize>() {
+            Err(e) => panic!("ERROR: Can't parse ibs argument: {}", e),
+            Ok(ibs) => ibs
+        },
     };
 
     println!("ibs: {}", ibs);
