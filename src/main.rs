@@ -10,6 +10,19 @@ use std::io::BufWriter;
 
 const BLOCKSIZE:usize = 4096;
 
+fn parse_bs(arg: String) -> Result<usize, Error> {
+    return arg.parse::<usize>()
+/*
+    {
+        Err(e) => panic!(
+            "ERROR: Can't parse ibs argument '{}': {}",
+            arg,
+            e),
+        Ok(ret) => Ok(ret)
+    }
+*/
+}
+
 fn main() -> io::Result<()> {
     let matches = App::new("rusdd: dd in Rust")
         .version(clap::crate_version!())
@@ -56,14 +69,18 @@ fn main() -> io::Result<()> {
     let outfile_name = matches.value_of("OUTPUT").unwrap();
 
     let ibs = match matches.value_of("ibs") {
-        None => BLOCKSIZE,
-        Some(ibs) => match ibs.parse::<usize>() {
-            Err(e) => panic!("ERROR: Can't parse ibs argument: {}", e),
-            Ok(ibs) => ibs
-        },
+        None => None,
+        Some(ibs_str) => {
+            match ibs_str.parse::<usize>() {
+                Err(e) => panic!(
+                    "ERROR: Can't parse ibs argument '{}': {}",
+                    ibs_str,
+                    e),
+                Ok(ibs) => Some(ibs)
+            }
+        }
     };
-
-    println!("ibs: {}", ibs);
+    let ibs = ibs.unwrap_or(BLOCKSIZE);
 
     let infile = OpenOptions::new()
         .read(true)
