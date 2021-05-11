@@ -6,22 +6,11 @@ use std::fs::OpenOptions;
 use std::io;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::io::Seek;
+use std::io::SeekFrom;
 //use std::convert::{From, TryFrom};
 
 const BLOCKSIZE:usize = 4096;
-
-fn parse_bs(arg: String) -> Result<usize, Error> {
-    return arg.parse::<usize>()
-/*
-    {
-        Err(e) => panic!(
-            "ERROR: Can't parse ibs argument '{}': {}",
-            arg,
-            e),
-        Ok(ret) => Ok(ret)
-    }
-*/
-}
 
 fn main() -> io::Result<()> {
     let matches = App::new("rusdd: dd in Rust")
@@ -63,6 +52,20 @@ fn main() -> io::Result<()> {
             .value_name("BLOCKSIZE")
             .conflicts_with("blocksize")
         )
+        .arg(Arg::with_name("iseek")
+            .help("skip N ibs-sized blocks at start of output")
+            .long("iseek")
+            .alias("iskip")
+            .takes_value(true)
+            .value_name("N")
+        )
+        .arg(Arg::with_name("oseek")
+            .help("skip N obs-sized blocks at start of output")
+            .long("oseek")
+            .alias("oskip")
+            .takes_value(true)
+            .value_name("N")
+        )
         .get_matches();
 
     let infile_name = matches.value_of("INPUT").unwrap();
@@ -82,13 +85,35 @@ fn main() -> io::Result<()> {
     };
     let ibs = ibs.unwrap_or(BLOCKSIZE);
 
-    let infile = OpenOptions::new()
+    let mut infile = OpenOptions::new()
         .read(true)
         .open(infile_name)?;
-    let outfile = OpenOptions::new()
+
+    let iseek = matches.value_of("iseek")
+        .unwrap_or("0")
+        .parse::<u64>()
+        .unwrap_or(0);
+    let iseek = iseek * ibs as u64;
+
+    infile.seek(SeekFrom::Start(iseek)).unwrap();
+
+    let obs = matches.value_of("obs");
+    let obs = match obs {
+        None => BLOCKSIZE,
+        Some(obs) => obs.parse::<usize>().unwrap_or(BLOCKSIZE)
+    };
+
+    let mut outfile = OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(outfile_name)?;
+
+    let oseek = matches.value_of("oseek")
+        .unwrap_or("0")
+        .parse::<u64>()
+        .unwrap_or(0);
+    let oseek = oseek * obs as u64;
+    outfile.seek(SeekFrom::Start(oseek)).unwrap();
 
     let buf_size = 1 * 1024 * 1024;
     let mut reader = BufReader::with_capacity(ibs, infile);
