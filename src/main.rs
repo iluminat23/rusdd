@@ -66,10 +66,24 @@ fn main() -> io::Result<()> {
             .takes_value(true)
             .value_name("N")
         )
+        .arg(Arg::with_name("append")
+            .help("append to the end of the output file (implies notruncate)")
+            .long("append")
+            .takes_value(false)
+        )
+        .arg(Arg::with_name("notrunc")
+            .help("don't truncate the output file")
+            .long("notruncate")
+            .alias("notrunc")
+            .takes_value(false)
+        )
         .get_matches();
 
     let infile_name = matches.value_of("INPUT").unwrap();
     let outfile_name = matches.value_of("OUTPUT").unwrap();
+
+    let trunc = !(matches.is_present("notrunc") || matches.is_present("append"));
+    let append = matches.is_present("append");
 
     let ibs = match matches.value_of("ibs") {
         None => None,
@@ -105,7 +119,8 @@ fn main() -> io::Result<()> {
 
     let mut outfile = OpenOptions::new()
         .write(true)
-        .truncate(true)
+        .truncate(trunc)
+        .append(append)
         .open(outfile_name)?;
 
     let oseek = matches.value_of("oseek")
