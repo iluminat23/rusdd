@@ -130,9 +130,8 @@ fn main() -> io::Result<()> {
     let oseek = oseek * obs as u64;
     outfile.seek(SeekFrom::Start(oseek)).unwrap();
 
-    let buf_size = 1 * 1024 * 1024;
     let mut reader = BufReader::with_capacity(ibs, infile);
-    let mut writer = BufWriter::with_capacity(buf_size, outfile);
+    let mut writer = BufWriter::with_capacity(obs, outfile);
 
     io::copy(&mut reader, &mut writer)?;
 
