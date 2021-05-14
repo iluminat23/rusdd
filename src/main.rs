@@ -4,10 +4,7 @@ extern crate clap;
 use clap::{Arg, App};
 use std::fs::OpenOptions;
 use std::io;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Seek;
-use std::io::SeekFrom;
+use std::io::{BufReader, Read, Write, Seek, SeekFrom};
 //use std::convert::{From, TryFrom};
 
 const BLOCKSIZE:usize = 4096;
@@ -77,6 +74,11 @@ fn main() -> io::Result<()> {
             .alias("notrunc")
             .takes_value(false)
         )
+        .arg(Arg::with_name("sparse")
+            .help("try to seek rather than write the output for NUL input blocks")
+            .long("sparse")
+            .takes_value(false)
+        )
         .get_matches();
 
     let infile_name = matches.value_of("INPUT").unwrap();
@@ -84,6 +86,7 @@ fn main() -> io::Result<()> {
 
     let trunc = !(matches.is_present("notrunc") || matches.is_present("append"));
     let append = matches.is_present("append");
+    let sparse = matches.is_present("sparse");
 
     let ibs = match matches.value_of("ibs") {
         None => None,
@@ -99,7 +102,7 @@ fn main() -> io::Result<()> {
     };
     let ibs = ibs.unwrap_or(BLOCKSIZE);
 
-    let mut infile = OpenOptions::new()
+    let mut ifile = OpenOptions::new()
         .read(true)
         .open(infile_name)?;
 
@@ -109,7 +112,7 @@ fn main() -> io::Result<()> {
         .unwrap_or(0);
     let iseek = iseek * ibs as u64;
 
-    infile.seek(SeekFrom::Start(iseek)).unwrap();
+    ifile.seek(SeekFrom::Start(iseek)).unwrap();
 
     let obs = matches.value_of("obs");
     let obs = match obs {
@@ -117,7 +120,7 @@ fn main() -> io::Result<()> {
         Some(obs) => obs.parse::<usize>().unwrap_or(BLOCKSIZE)
     };
 
-    let mut outfile = OpenOptions::new()
+    let mut ofile = OpenOptions::new()
         .write(true)
         .truncate(trunc)
         .append(append)
@@ -128,12 +131,31 @@ fn main() -> io::Result<()> {
         .parse::<u64>()
         .unwrap_or(0);
     let oseek = oseek * obs as u64;
-    outfile.seek(SeekFrom::Start(oseek)).unwrap();
+    ofile.seek(SeekFrom::Start(oseek)).expect("seek error");
 
-    let mut reader = BufReader::with_capacity(ibs, infile);
-    let mut writer = BufWriter::with_capacity(obs, outfile);
+    let mut reader = BufReader::with_capacity(ibs, ifile);
+    let mut obuf = vec![0; obs];
+    let ret = reader.read(&mut obuf);
 
-    io::copy(&mut reader, &mut writer)?;
+    let skip = if sparse { sparseable(&obuf) } else { false };
+    if skip {
+        println!("seek");
+        ofile.seek(SeekFrom::Current(obs as i64)).expect("seek error");
+    } else {
+        println!("write: {}", obuf.len());
+        ofile.write(&obuf).unwrap();
+    };
 
+    if skip {
+        let pos = ofile.stream_position()?;
+        ofile.set_len(pos)?;
+    }
     Ok(())
+}
+
+fn sparseable(buf: &[u8]) -> bool {
+    for b in buf {
+        if *b != 0 { return false }
+    }
+    true
 }
